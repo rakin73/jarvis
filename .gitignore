@@ -1,0 +1,19 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+
+# SQLite / Local databases
+*.sqlite
+*.sqlite3
+memory/chroma_db/
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
