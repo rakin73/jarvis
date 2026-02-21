@@ -1,0 +1,8 @@
+# Core
+openai>=1.30.0
+pyyaml>=6.0
+rich>=13.0
+prompt_toolkit>=3.0
+
+# Semantic memory (optional but recommended)
+chromadb>=0.5.0

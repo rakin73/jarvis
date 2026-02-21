@@ -1,0 +1,137 @@
+# Jarvis Policies Configuration
+# Controls what the assistant is allowed to do
+
+general:
+  name: "Jarvis"
+  version: "1.0.0"
+  owner: "Rakin"
+
+shell:
+  enabled: true
+  # Only these commands are allowed (allowlist approach)
+  allowed_commands:
+    - "ls"
+    - "cat"
+    - "echo"
+    - "grep"
+    - "find"
+    - "wc"
+    - "date"
+    - "whoami"
+    - "pwd"
+    - "head"
+    - "tail"
+    - "sort"
+    - "uniq"
+    - "curl"
+    - "python3"
+    - "pip"
+    - "git"
+    - "brew"
+    - "open"  # macOS open command
+  blocked_patterns:
+    - "rm -rf /"
+    - "sudo rm"
+    - "mkfs"
+    - "> /dev"
+    - "dd if="
+
+mac:
+  enabled: true
+  allowed_actions:
+    - "open_app"
+    - "set_volume"
+    - "get_clipboard"
+    - "set_clipboard"
+    - "notify"
+    - "screenshot"
+    - "toggle_dark_mode"
+    - "lock_screen"
+    - "empty_trash"
+
+notes:
+  enabled: true
+  max_note_length: 10000
+
+saviynt:
+  enabled: true
+  # Templates for common Saviynt queries
+  query_templates:
+    orphan_accounts: |
+      SELECT u.username, u.displayname, u.statuskey
+      FROM users u
+      LEFT JOIN accounts a ON u.userkey = a.userkey
+      WHERE a.accountkey IS NULL
+      AND u.statuskey = 1
+    
+    inactive_accounts: |
+      SELECT a.name, a.displayname, a.status, 
+             ep.endpointname, a.lastupdatedate
+      FROM accounts a
+      JOIN endpoints ep ON a.endpointkey = ep.endpointkey
+      WHERE a.status IN (0, 'Inactive', 'Disabled')
+      ORDER BY a.lastupdatedate DESC
+    
+    excessive_entitlements: |
+      SELECT u.username, u.displayname, COUNT(ae.entitlementvaluekey) as ent_count
+      FROM users u
+      JOIN accounts a ON u.userkey = a.userkey
+      JOIN account_entitlements ae ON a.accountkey = ae.accountkey
+      WHERE u.statuskey = 1
+      GROUP BY u.username, u.displayname
+      HAVING COUNT(ae.entitlementvaluekey) > {threshold}
+      ORDER BY ent_count DESC
+    
+    sod_violations: |
+      SELECT u.username, u.displayname,
+             ev1.entitlement_value as entitlement_1,
+             ev2.entitlement_value as entitlement_2
+      FROM users u
+      JOIN accounts a ON u.userkey = a.userkey
+      JOIN account_entitlements ae1 ON a.accountkey = ae1.accountkey
+      JOIN entitlement_values ev1 ON ae1.entitlementvaluekey = ev1.entitlementvaluekey
+      JOIN account_entitlements ae2 ON a.accountkey = ae2.accountkey
+      JOIN entitlement_values ev2 ON ae2.entitlementvaluekey = ev2.entitlementvaluekey
+      WHERE ev1.entitlementvaluekey < ev2.entitlementvaluekey
+      AND (ev1.entitlement_value, ev2.entitlement_value) IN ({sod_pairs})
+    
+    provisioning_failures: |
+      SELECT t.taskid, t.taskkey, t.status, t.comments,
+             u.username, ep.endpointname, t.createdate
+      FROM tasks t
+      JOIN users u ON t.userkey = u.userkey  
+      JOIN endpoints ep ON t.endpointkey = ep.endpointkey
+      WHERE t.status IN ('Failed', 'Error', 'Discontinued')
+      AND t.createdate >= '{start_date}'
+      ORDER BY t.createdate DESC
+
+    rest_connector_status: |
+      SELECT c.connectionname, c.status, c.connectiontype,
+             ep.endpointname, ep.status as ep_status
+      FROM connections c
+      JOIN endpoints ep ON c.endpointkey = ep.endpointkey
+      WHERE c.connectiontype = 'REST'
+      ORDER BY c.connectionname
+
+brain:
+  model: "gpt-4o"
+  temperature: 0.3
+  max_tokens: 2000
+  system_prompt: |
+    You are Jarvis, a personal AI assistant for Rakin, an IAM specialist 
+    working with Saviynt Identity Access Management. You help with:
+    - Generating Saviynt queries and troubleshooting integrations
+    - Managing notes and knowledge
+    - Running safe shell commands
+    - Controlling macOS applications
+    
+    Be concise, technical, and proactive. Remember context from previous 
+    interactions. When generating Saviynt queries, always explain what the 
+    query does and any parameters that need customization.
+    
+    Style: Direct, no fluff. Like a senior engineer pair-programming with Rakin.
+
+logging:
+  level: "INFO"
+  file: "logs/jarvis.log"
+  max_size_mb: 50
